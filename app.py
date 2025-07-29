@@ -9,6 +9,17 @@ from datetime import datetime
 # Setup
 st.set_page_config(page_title="Mental Wellness Journal", page_icon="🧠")
 st.title("Mental Wellness Journal Chatbot")
+
+# Ask for user name
+username = st.text_input("Enter your name (for a personal journal):").strip().lower()
+
+if not username:
+    st.warning("Please enter your name to continue.")
+    st.stop()
+
+# Create personalized file name
+file_name = f"{username}_journal_entries.csv"
+
 st.write("Hey there! Just checking in - how are you really feeling today? Whatever it is, you can share it here. I'm all ears and here for you.")
 
 # Custom emotion override
@@ -34,17 +45,9 @@ if st.button("Analyze Mood"):
     if user_input.strip() == "":
         st.warning("Please write something before analyzing.")
     else:
-        # Detect emotion keywords
         override_sentiment = detect_emotion_keywords(user_input)
+        sentiment = override_sentiment if override_sentiment is not None else TextBlob(user_input).sentiment.polarity
 
-        # Use override if found, else fallback to TextBlob
-        if override_sentiment is not None:
-            sentiment = override_sentiment
-        else:
-            blob = TextBlob(user_input)
-            sentiment = blob.sentiment.polarity
-
-        # Mood classification
         if sentiment > 0.3:
             st.success("😊 You're radiating good vibes today, keep riding the waves!")
         elif sentiment < -0.1:
@@ -55,14 +58,12 @@ if st.button("Analyze Mood"):
         st.markdown("---")
         st.write("**Your Mood Score:**", round(sentiment, 2))
 
-        # Save entry to CSV
         entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "entry": user_input,
             "mood_score": round(sentiment, 2)
         }
 
-        file_name = "journal_entries.csv"
         if os.path.exists(file_name):
             df = pd.read_csv(file_name)
             df = pd.concat([df, pd.DataFrame([entry])], ignore_index=True)
@@ -76,8 +77,8 @@ if st.button("Analyze Mood"):
 st.markdown("---")
 st.subheader("📊 Mood Trend Over Time")
 
-if os.path.exists("journal_entries.csv"):
-    df = pd.read_csv("journal_entries.csv")
+if os.path.exists(file_name):
+    df = pd.read_csv(file_name)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df = df.sort_values("timestamp")
 
@@ -97,7 +98,7 @@ else:
 st.markdown("---")
 st.subheader("📔 Your Past Journal Entries")
 
-if os.path.exists("journal_entries.csv"):
+if os.path.exists(file_name):
     st.dataframe(df[["timestamp", "entry", "mood_score"]].sort_values(by="timestamp", ascending=False).head(5))
 else:
     st.info("No past entries found yet.")
@@ -106,9 +107,10 @@ else:
 st.markdown("---")
 st.subheader("📥 Download Your Journal")
 
-if os.path.exists("journal_entries.csv"):
-    with open("journal_entries.csv", "rb") as f:
+if os.path.exists(file_name):
+    with open(file_name, "rb") as f:
         data = f.read()
         b64 = base64.b64encode(data).decode()
-        href = f'<a href="data:file/csv;base64,{b64}" download="my_journal.csv">Download Journal CSV</a>'
+        href = f'<a href="data:file/csv;base64,{b64}" download="{username}_journal.csv">Download Journal CSV</a>'
         st.markdown(href, unsafe_allow_html=True)
+
